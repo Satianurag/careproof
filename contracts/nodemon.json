@@ -1,0 +1,6 @@
+{
+  "watch": ["src"],
+  "ext": "ts",
+  "exec": "npm run build && npm run deploy",
+  "ignore": ["dist", "node_modules", "contracts/managed"]
+}

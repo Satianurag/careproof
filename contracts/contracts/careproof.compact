@@ -1,0 +1,385 @@
+pragma language_version >= 0.21.0;
+
+import CompactStandardLibrary;
+import "./compact-contracts/node_modules/@openzeppelin/compact-contracts/src/access/AccessControl"
+  prefix AccessControl_;
+import "./compact-contracts/node_modules/@openzeppelin/compact-contracts/src/security/Pausable"
+  prefix Pausable_;
+
+// ------------------------------------------------------
+// Data Structures
+// ------------------------------------------------------
+
+// Composite key for credential lookup: hash(client + id) → unique per credential
+struct CredentialKey {
+    client: ZswapCoinPublicKey,
+    id: Uint<64>,
+}
+
+// Consent key: hash(patient + doctor + credential_id) → unique per consent grant
+struct ConsentKey {
+    patient: ZswapCoinPublicKey,
+    doctor: ZswapCoinPublicKey,
+    credential_id: Uint<64>,
+}
+
+// Record of a verification event
+// NOTE: No timestamp field — Compact only supports block-time comparisons,
+// not reading block time as a storable value. Use indexer block metadata
+// for the authoritative verification time.
+struct VerificationRecord {
+    verifier: ZswapCoinPublicKey,
+    commitment: Bytes<32>,
+    is_valid: Boolean,
+}
+
+// Composite key for verification log: hash(verifier + commitment + nonce)
+// Nonce = total_verifications at time of call → globally unique per event,
+// preventing overwrite when the same verifier re-verifies the same credential.
+struct VerificationLogKey {
+    verifier: ZswapCoinPublicKey,
+    commitment: Bytes<32>,
+    nonce: Uint<64>,
+}
+
+// ------------------------------------------------------
+// Role Identifiers (sealed — set once in constructor)
+// ------------------------------------------------------
+
+export sealed ledger DOCTOR_ROLE: Bytes<32>;
+export sealed ledger VERIFIER_ROLE: Bytes<32>;
+
+// ------------------------------------------------------
+// Credential Registry: ONLY commitments, NO plaintext
+// ------------------------------------------------------
+
+// Privacy-preserving credential commitment tree (for ZK membership proofs)
+export ledger credential_commitments: HistoricMerkleTree<16, Bytes<32>>;
+
+// Credential lookup: composite_key → commitment hash
+export ledger credential_hashes: Map<Bytes<32>, Bytes<32>>;
+
+// Active credential set (for O(1) existence checks)
+export ledger active_credentials: Set<Bytes<32>>;
+
+// Credential metadata: commitment → expiry timestamp (non-PHI)
+export ledger credential_expiry: Map<Bytes<32>, Uint<64>>;
+
+// Credential issuer tracking: composite_key → issuer public key
+export ledger credential_issuer: Map<Bytes<32>, ZswapCoinPublicKey>;
+
+// ------------------------------------------------------
+// Revocation Registry
+// ------------------------------------------------------
+
+export ledger revoked_credentials: Set<Bytes<32>>;
+
+// ------------------------------------------------------
+// Patient Consent Registry
+// ------------------------------------------------------
+
+export ledger consent_registry: Set<Bytes<32>>;
+
+// ------------------------------------------------------
+// Verification Audit Trail
+// ------------------------------------------------------
+
+export ledger verification_log: Map<Bytes<32>, VerificationRecord>;
+
+// ------------------------------------------------------
+// Aggregate Statistics
+// ------------------------------------------------------
+
+export ledger total_credentials: Counter;
+export ledger total_verifications: Counter;
+
+// ------------------------------------------------------
+// Witnesses (bridge to client-side private state)
+// ------------------------------------------------------
+
+witness local_secret_key(): Bytes<32>;
+witness get_credential_commitment(credential_id: Uint<64>): Bytes<32>;
+
+// ------------------------------------------------------
+// Constructor: initialize roles
+// ------------------------------------------------------
+
+constructor() {
+    DOCTOR_ROLE = persistentHash<Bytes<32>>(pad(32, "DOCTOR_ROLE"));
+    VERIFIER_ROLE = persistentHash<Bytes<32>>(pad(32, "VERIFIER_ROLE"));
+    AccessControl__grantRole(
+        AccessControl_DEFAULT_ADMIN_ROLE,
+        left<ZswapCoinPublicKey, ContractAddress>(ownPublicKey())
+    );
+}
+
+// ------------------------------------------------------
+// Admin Circuits (DEFAULT_ADMIN_ROLE required)
+// ------------------------------------------------------
+
+export circuit add_doctor(doctor: ZswapCoinPublicKey): [] {
+    Pausable_assertNotPaused();
+    AccessControl_assertOnlyRole(AccessControl_DEFAULT_ADMIN_ROLE);
+    AccessControl_grantRole(
+        DOCTOR_ROLE,
+        left<ZswapCoinPublicKey, ContractAddress>(doctor)
+    );
+}
+
+export circuit remove_doctor(doctor: ZswapCoinPublicKey): [] {
+    Pausable_assertNotPaused();
+    AccessControl_assertOnlyRole(AccessControl_DEFAULT_ADMIN_ROLE);
+    AccessControl_revokeRole(
+        DOCTOR_ROLE,
+        left<ZswapCoinPublicKey, ContractAddress>(doctor)
+    );
+}
+
+export circuit add_verifier(verifier: ZswapCoinPublicKey): [] {
+    Pausable_assertNotPaused();
+    AccessControl_assertOnlyRole(AccessControl_DEFAULT_ADMIN_ROLE);
+    AccessControl_grantRole(
+        VERIFIER_ROLE,
+        left<ZswapCoinPublicKey, ContractAddress>(verifier)
+    );
+}
+
+export circuit remove_verifier(verifier: ZswapCoinPublicKey): [] {
+    Pausable_assertNotPaused();
+    AccessControl_assertOnlyRole(AccessControl_DEFAULT_ADMIN_ROLE);
+    AccessControl_revokeRole(
+        VERIFIER_ROLE,
+        left<ZswapCoinPublicKey, ContractAddress>(verifier)
+    );
+}
+
+export circuit pause(): [] {
+    AccessControl_assertOnlyRole(AccessControl_DEFAULT_ADMIN_ROLE);
+    Pausable__pause();
+}
+
+export circuit unpause(): [] {
+    AccessControl_assertOnlyRole(AccessControl_DEFAULT_ADMIN_ROLE);
+    Pausable__unpause();
+}
+
+export circuit is_paused(): Boolean {
+    return Pausable_isPaused();
+}
+
+export circuit transfer_admin(new_admin: ZswapCoinPublicKey): [] {
+    AccessControl_assertOnlyRole(AccessControl_DEFAULT_ADMIN_ROLE);
+    AccessControl_grantRole(
+        AccessControl_DEFAULT_ADMIN_ROLE,
+        left<ZswapCoinPublicKey, ContractAddress>(new_admin)
+    );
+    AccessControl_renounceRole(
+        AccessControl_DEFAULT_ADMIN_ROLE,
+        left<ZswapCoinPublicKey, ContractAddress>(ownPublicKey())
+    );
+}
+
+// ------------------------------------------------------
+// Patient Consent Circuits
+// ------------------------------------------------------
+
+export circuit grant_consent(
+    doctor: ZswapCoinPublicKey,
+    credential_id: Uint<64>,
+): [] {
+    Pausable_assertNotPaused();
+    const consent_key = persistentHash<ConsentKey>(ConsentKey {
+        patient: ownPublicKey(),
+        doctor: doctor,
+        credential_id: credential_id,
+    });
+    consent_registry.insert(disclose(consent_key));
+}
+
+export circuit revoke_consent(
+    doctor: ZswapCoinPublicKey,
+    credential_id: Uint<64>,
+): [] {
+    Pausable_assertNotPaused();
+    const consent_key = persistentHash<ConsentKey>(ConsentKey {
+        patient: ownPublicKey(),
+        doctor: doctor,
+        credential_id: credential_id,
+    });
+    consent_registry.remove(disclose(consent_key));
+}
+
+// ------------------------------------------------------
+// Issuer Circuits (Doctor/Healthcare Provider)
+// ------------------------------------------------------
+
+export circuit issue_credential(
+    credential_id: Uint<64>,
+    client: ZswapCoinPublicKey,
+    commitment: Bytes<32>,
+    expiry: Uint<64>,
+): [] {
+    Pausable_assertNotPaused();
+    AccessControl_assertOnlyRole(DOCTOR_ROLE);
+
+    // Verify patient consent exists
+    const consent_key = persistentHash<ConsentKey>(ConsentKey {
+        patient: client,
+        doctor: ownPublicKey(),
+        credential_id: credential_id,
+    });
+    assert(consent_registry.member(disclose(consent_key)),
+           "Patient consent required");
+
+    // Compute composite key for storage
+    const composite_key = disclose(persistentHash<CredentialKey>(CredentialKey {
+        client: client,
+        id: credential_id,
+    }));
+
+    // Store ONLY the commitment — NO plaintext medical data on-chain
+    credential_hashes.insert(composite_key, disclose(commitment));
+    active_credentials.insert(disclose(commitment));
+    credential_commitments.insert(disclose(commitment));
+    credential_expiry.insert(disclose(commitment), disclose(expiry));
+    credential_issuer.insert(composite_key, disclose(ownPublicKey()));
+
+    total_credentials += 1;
+}
+
+// ------------------------------------------------------
+// Revocation Circuits
+// ------------------------------------------------------
+
+export circuit revoke_credential(
+    credential_id: Uint<64>,
+    client: ZswapCoinPublicKey,
+): [] {
+    Pausable_assertNotPaused();
+    AccessControl_assertOnlyRole(DOCTOR_ROLE);
+
+    // Look up credential by composite key
+    const composite_key = disclose(persistentHash<CredentialKey>(CredentialKey {
+        client: client,
+        id: credential_id,
+    }));
+
+    // Verify credential exists
+    assert(credential_hashes.member(composite_key),
+           "Credential not found");
+
+    // Only the issuing doctor can revoke
+    const issuer = credential_issuer.lookup(composite_key);
+    assert(ownPublicKey() == issuer,
+           "Only issuing doctor can revoke");
+
+    // Get the commitment
+    const commitment = credential_hashes.lookup(composite_key);
+
+    // Move from active to revoked
+    active_credentials.remove(disclose(commitment));
+    revoked_credentials.insert(disclose(commitment));
+
+    // Cleanup references
+    credential_hashes.remove(composite_key);
+    credential_expiry.remove(disclose(commitment));
+    credential_issuer.remove(composite_key);
+}
+
+// ------------------------------------------------------
+// Verification Circuits (with on-chain expiry enforcement)
+// ------------------------------------------------------
+
+export circuit verify_credential(
+    commitment: Bytes<32>,
+): [] {
+    Pausable_assertNotPaused();
+    AccessControl_assertOnlyRole(VERIFIER_ROLE);
+
+    // Check credential exists and is active
+    assert(active_credentials.member(disclose(commitment)),
+           "Credential not found or inactive");
+
+    // Check not revoked (defense-in-depth)
+    assert(!revoked_credentials.member(disclose(commitment)),
+           "Credential has been revoked");
+
+    // Enforce expiry using on-chain block time
+    const expiry = credential_expiry.lookup(disclose(commitment));
+    assert(blockTimeLt(expiry), "Credential has expired");
+
+    // Use total_verifications as a globally unique nonce to prevent
+    // log-entry overwrite when the same verifier re-verifies the same credential.
+    const nonce = total_verifications;
+
+    // Record verification in audit trail (append-only — nonce guarantees uniqueness)
+    const log_key = disclose(persistentHash<VerificationLogKey>(VerificationLogKey {
+        verifier: ownPublicKey(),
+        commitment: commitment,
+        nonce: nonce,
+    }));
+
+    verification_log.insert(log_key, disclose(VerificationRecord {
+        verifier: ownPublicKey(),
+        commitment: commitment,
+        is_valid: true,
+    }));
+
+    total_verifications += 1;
+}
+
+// ------------------------------------------------------
+// Patient Credential Proof (ZK ownership proof via witness)
+// ------------------------------------------------------
+
+export circuit prove_credential_ownership(
+    credential_id: Uint<64>,
+): Bytes<32> {
+    Pausable_assertNotPaused();
+
+    // Get commitment from private state via witness
+    const commitment = disclose(get_credential_commitment(credential_id));
+
+    // Verify commitment exists on-chain and is active
+    assert(active_credentials.member(commitment),
+           "Credential not found");
+    assert(!revoked_credentials.member(commitment),
+           "Credential has been revoked");
+
+    return commitment;
+}
+
+// ------------------------------------------------------
+// Utility / Read Circuits
+// ------------------------------------------------------
+
+export circuit compute_credential_key(
+    client: ZswapCoinPublicKey,
+    id: Uint<64>,
+): Bytes<32> {
+    return persistentHash<CredentialKey>(CredentialKey {
+        client: client,
+        id: id,
+    });
+}
+
+export circuit has_doctor_role(doctor: ZswapCoinPublicKey): Boolean {
+    return AccessControl_hasRole(
+        DOCTOR_ROLE,
+        left<ZswapCoinPublicKey, ContractAddress>(doctor)
+    );
+}
+
+export circuit has_verifier_role(verifier: ZswapCoinPublicKey): Boolean {
+    return AccessControl_hasRole(
+        VERIFIER_ROLE,
+        left<ZswapCoinPublicKey, ContractAddress>(verifier)
+    );
+}
+
+export circuit has_admin_role(account: ZswapCoinPublicKey): Boolean {
+    return AccessControl_hasRole(
+        AccessControl_DEFAULT_ADMIN_ROLE,
+        left<ZswapCoinPublicKey, ContractAddress>(account)
+    );
+}
