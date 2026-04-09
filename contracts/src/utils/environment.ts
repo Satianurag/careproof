@@ -3,18 +3,9 @@ import path from "path";
 import { setNetworkId } from "@midnight-ntwrk/midnight-js/network-id";
 import { NetworkConfig } from "../providers/midnight-providers.js";
 
-export type SupportedMidnightNetwork = "undeployed" | "preview" | "preprod" | "mainnet";
+export type SupportedMidnightNetwork = "preview" | "preprod";
 
 const NETWORKS: Record<SupportedMidnightNetwork, NetworkConfig & { networkId: SupportedMidnightNetwork }> = {
-  undeployed: {
-    key: "undeployed",
-    name: "Localnet",
-    networkId: "undeployed",
-    indexer: "http://127.0.0.1:8088/api/v3/graphql",
-    indexerWS: "ws://127.0.0.1:8088/api/v3/graphql/ws",
-    node: "http://127.0.0.1:9944",
-    proofServer: "http://127.0.0.1:6300",
-  },
   preview: {
     key: "preview",
     name: "Preview Testnet",
@@ -33,15 +24,6 @@ const NETWORKS: Record<SupportedMidnightNetwork, NetworkConfig & { networkId: Su
     node: "https://rpc.preprod.midnight.network",
     proofServer: "https://lace-proof-pub.preprod.midnight.network",
   },
-  mainnet: {
-    key: "mainnet",
-    name: "Mainnet",
-    networkId: "mainnet",
-    indexer: "https://indexer.midnight.network/api/v3/graphql",
-    indexerWS: "wss://indexer.midnight.network/api/v3/graphql/ws",
-    node: "https://rpc.midnight.network",
-    proofServer: "https://lace-proof-pub.midnight.network",
-  },
 };
 
 export interface FundingInstruction {
@@ -52,7 +34,7 @@ export interface FundingInstruction {
 export class EnvironmentManager {
   static getRequestedNetwork(): SupportedMidnightNetwork {
     const env = process.env.MIDNIGHT_NETWORK as SupportedMidnightNetwork | undefined;
-    return env && env in NETWORKS ? env : "undeployed";
+    return env && env in NETWORKS ? env : "preprod";
   }
 
   static getNetworkConfig(): NetworkConfig {
@@ -70,28 +52,14 @@ export class EnvironmentManager {
     };
   }
 
-  static isLocalNetwork(config: NetworkConfig): boolean {
-    return config.key === "undeployed";
-  }
-
   static getFundingInstructions(config: NetworkConfig): FundingInstruction {
-    if (config.key === "undeployed") {
-      return {
-        title: "How to fund your localnet wallet",
-        steps: [
-          "Start the local services with 'npm run localnet:up'.",
-          "Use the official local funding flow from midnight-local-dev.",
-          "Wait for the wallet to sync and accumulate DUST, then rerun this command.",
-        ],
-      };
-    }
     return {
       title: `How to fund your ${config.name} wallet`,
       steps: [
         `Navigate to the faucet: https://faucet.${config.key}.midnight.network/`,
         "Enter your wallet address and request tNIGHT tokens.",
-        `Register for DUST at: https://dust.${config.key}.midnight.network/`,
-        "Wait for the wallet to sync and accumulate DUST, then rerun this command.",
+        "Wait for the wallet to sync after the faucet transfer lands.",
+        "Deploy and CLI flows will register DUST automatically when the wallet is ready.",
       ],
     };
   }
@@ -112,6 +80,20 @@ export class EnvironmentManager {
     }
   }
 
+  static getPrivateStatePassword(): string {
+    const password = process.env.PRIVATE_STATE_PASSWORD;
+
+    if (!password) {
+      throw new Error("Missing required environment variable: PRIVATE_STATE_PASSWORD");
+    }
+
+    if (password.length < 16) {
+      throw new Error("PRIVATE_STATE_PASSWORD must be at least 16 characters long");
+    }
+
+    return password;
+  }
+
   static checkContractCompiled(contractName: string): boolean {
     const contractPath = path.join(
       process.cwd(),
@@ -120,8 +102,12 @@ export class EnvironmentManager {
       contractName,
     );
     const keysPath = path.join(contractPath, "keys");
-    const contractModulePath = path.join(contractPath, "contract", "index.js");
+    const cjsContractModulePath = path.join(contractPath, "contract", "index.cjs");
+    const esmContractModulePath = path.join(contractPath, "contract", "index.js");
 
-    return fs.existsSync(keysPath) && fs.existsSync(contractModulePath);
+    return (
+      fs.existsSync(keysPath) &&
+      (fs.existsSync(cjsContractModulePath) || fs.existsSync(esmContractModulePath))
+    );
   }
 }

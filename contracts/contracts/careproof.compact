@@ -1,9 +1,9 @@
 pragma language_version >= 0.21.0;
 
 import CompactStandardLibrary;
-import "./compact-contracts/node_modules/@openzeppelin/compact-contracts/src/access/AccessControl"
+import "../node_modules/@openzeppelin-compact/contracts/src/access/AccessControl"
   prefix AccessControl_;
-import "./compact-contracts/node_modules/@openzeppelin/compact-contracts/src/security/Pausable"
+import "../node_modules/@openzeppelin-compact/contracts/src/security/Pausable"
   prefix Pausable_;
 
 // ------------------------------------------------------
@@ -92,13 +92,6 @@ export ledger verification_log: Map<Bytes<32>, VerificationRecord>;
 
 export ledger total_credentials: Counter;
 export ledger total_verifications: Counter;
-
-// ------------------------------------------------------
-// Witnesses (bridge to client-side private state)
-// ------------------------------------------------------
-
-witness local_secret_key(): Bytes<32>;
-witness get_credential_commitment(credential_id: Uint<64>): Bytes<32>;
 
 // ------------------------------------------------------
 // Constructor: initialize roles
@@ -326,27 +319,6 @@ export circuit verify_credential(
     }));
 
     total_verifications += 1;
-}
-
-// ------------------------------------------------------
-// Patient Credential Proof (ZK ownership proof via witness)
-// ------------------------------------------------------
-
-export circuit prove_credential_ownership(
-    credential_id: Uint<64>,
-): Bytes<32> {
-    Pausable_assertNotPaused();
-
-    // Get commitment from private state via witness
-    const commitment = disclose(get_credential_commitment(credential_id));
-
-    // Verify commitment exists on-chain and is active
-    assert(active_credentials.member(commitment),
-           "Credential not found");
-    assert(!revoked_credentials.member(commitment),
-           "Credential has been revoked");
-
-    return commitment;
 }
 
 // ------------------------------------------------------

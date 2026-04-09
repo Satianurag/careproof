@@ -41,6 +41,7 @@ async function main() {
 
     const networkConfig = EnvironmentManager.getNetworkConfig();
     const contractName = process.env.CONTRACT_NAME || "careproof";
+    const privateStatePassword = EnvironmentManager.getPrivateStatePassword();
     console.log(chalk.gray(`Network: ${networkConfig.name}`));
     console.log();
 
@@ -71,7 +72,7 @@ async function main() {
         printFundingInstructions(networkConfig);
         console.log(
           chalk.blue(
-            "⏳ Waiting for local funding...",
+            "⏳ Waiting for wallet funding...",
           ),
         );
         await waitForFunds(walletContext.wallet);
@@ -109,6 +110,7 @@ async function main() {
         contractName,
         walletContext,
         networkConfig,
+        privateStatePassword,
         privateStateStoreName: "careproof-private-state",
       });
 

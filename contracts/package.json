@@ -6,28 +6,19 @@
   "author": "",
   "license": "MIT",
   "scripts": {
-    "dev": "npm run localnet:up && npm run watch",
-    "watch": "nodemon --config nodemon.json",
     "setup": "npm run compile && npm run build && npm run deploy",
     "compile": "compact compile +0.30.0 contracts/careproof.compact contracts/managed/careproof",
-    "build": "tsc",
-    "wallet:bootstrap": "npm run build && node dist/bootstrap-local-wallet.js",
+    "build": "rm -rf dist && tsc",
     "deploy": "node dist/deploy.js",
     "cli": "node dist/cli.js",
-    "e2e": "npm run build && node dist/e2e-smoke.js",
     "check-balance": "npm run build && node dist/check-balance.js",
-    "fund-local": "npm run build && node dist/fund-local.js",
     "health-check": "npm run build && node dist/health-check.js",
     "reset": "rm -rf contracts/managed deployment.json dist && npm run compile",
     "validate": "tsc --noEmit && npm run compile",
-    "clean": "rm -rf dist contracts/managed deployment.json",
-    "localnet:up": "docker compose -f standalone.yml up -d",
-    "localnet:down": "docker compose -f standalone.yml down --remove-orphans",
-    "localnet:logs": "docker compose -f standalone.yml logs -f",
-    "proof-server": "docker run --rm -p 6300:6300 midnightntwrk/proof-server:8.0.3 midnight-proof-server -v",
-    "test": "vitest run"
+    "clean": "rm -rf dist contracts/managed deployment.json"
   },
   "dependencies": {
+    "@openzeppelin-compact/contracts": "file:./contracts/compact-contracts/contracts",
     "@midnight-ntwrk/compact-js": "^2.5.0",
     "@midnight-ntwrk/compact-runtime": "0.15.0",
     "@midnight-ntwrk/ledger-v8": "8.0.3",
@@ -42,7 +33,6 @@
     "@midnight-ntwrk/wallet-sdk-hd": "3.0.1",
     "@midnight-ntwrk/wallet-sdk-shielded": "2.1.0",
     "@midnight-ntwrk/wallet-sdk-unshielded-wallet": "2.1.0",
-    "bip39": "^3.1.0",
     "ws": "^8.18.3",
     "dotenv": "^16.3.1",
     "chalk": "^5.3.0",
@@ -51,10 +41,7 @@
   "devDependencies": {
     "@types/node": "^24.4.0",
     "@types/ws": "^8.5.10",
-    "concurrently": "^8.2.0",
-    "nodemon": "^3.0.1",
-    "typescript": "^6.0.2",
-    "vitest": "^4.1.2"
+    "typescript": "^6.0.2"
   },
   "engines": {
     "node": ">=22.0.0"

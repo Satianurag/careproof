@@ -45,7 +45,7 @@ export default function AdminPage() {
   const activeCount = ledgerStats?.activeCredentialCount ?? 0n
   const revokedCount = ledgerStats?.revokedCredentialCount ?? 0n
   const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || ""
-  const networkId = process.env.NEXT_PUBLIC_MIDNIGHT_NETWORK || "preview"
+  const networkId = process.env.NEXT_PUBLIC_MIDNIGHT_NETWORK || "preprod"
 
   return (
     <DashboardLayout role="admin" pageTitle="Admin Dashboard">

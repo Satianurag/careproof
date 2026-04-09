@@ -109,7 +109,6 @@ const navByRole: Record<UserRole, {
       icon: <FileTextIcon />,
       items: [
         { title: "View All", url: "/patient/credentials" },
-        { title: "Prove Ownership", url: "/patient#prove" },
       ],
     },
     {

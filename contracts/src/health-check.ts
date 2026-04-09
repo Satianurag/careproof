@@ -36,23 +36,10 @@ const checks: HealthCheck[] = [
     error: "Compact compiler not found. Install from https://docs.midnight.network",
   },
   {
-    name: "Docker",
-    message: "Checking Docker availability...",
-    check: async () => {
-      try {
-        execSync("docker --version", { stdio: "ignore" });
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    error: "Docker is not installed or not running. Install Docker to use the proof server.",
-  },
-  {
     name: "Environment File",
     message: "Checking .env configuration...",
     check: async () => fs.existsSync(".env"),
-    error: ".env file not found. Copy .env.example to .env and set WALLET_SEED.",
+    error: ".env file not found. Create one and set MIDNIGHT_NETWORK, WALLET_SEED, and PRIVATE_STATE_PASSWORD.",
   },
   {
     name: "Wallet Seed",
@@ -66,6 +53,17 @@ const checks: HealthCheck[] = [
     error: "WALLET_SEED not configured in .env. Generate one with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
   },
   {
+    name: "Private State Password",
+    message: "Checking private state encryption password...",
+    check: async () => {
+      if (!fs.existsSync(".env")) return false;
+      const envContent = fs.readFileSync(".env", "utf-8");
+      const match = envContent.match(/^PRIVATE_STATE_PASSWORD=(.*)$/m);
+      return Boolean(match && match[1] && match[1].trim().length >= 16);
+    },
+    error: "PRIVATE_STATE_PASSWORD must be configured in .env with at least 16 characters.",
+  },
+  {
     name: "Dependencies",
     message: "Checking node_modules...",
     check: async () => fs.existsSync("node_modules"),
@@ -75,9 +73,13 @@ const checks: HealthCheck[] = [
     name: "Contract Compilation",
     message: "Checking compiled contracts...",
     check: async () => {
+      const contractName = process.env.CONTRACT_NAME || "careproof";
       return (
-        fs.existsSync("contracts/managed/careproof/contract/index.js") &&
-        fs.existsSync("contracts/managed/careproof/keys")
+        fs.existsSync(`contracts/managed/${contractName}/keys`) &&
+        (
+          fs.existsSync(`contracts/managed/${contractName}/contract/index.cjs`) ||
+          fs.existsSync(`contracts/managed/${contractName}/contract/index.js`)
+        )
       );
     },
     error: "Contract not compiled or keys missing. Run 'npm run compile' first.",
@@ -87,16 +89,6 @@ const checks: HealthCheck[] = [
     message: "Checking TypeScript build...",
     check: async () => fs.existsSync("dist"),
     error: "Project not built. Run 'npm run build'.",
-  },
-  {
-    name: "Deployment File",
-    message: "Checking deployment.json...",
-    check: async () => {
-      if (!fs.existsSync("deployment.json")) return false;
-      const d = JSON.parse(fs.readFileSync("deployment.json", "utf-8"));
-      return typeof d.contractAddress === "string" && d.contractAddress.length > 0;
-    },
-    error: "No valid deployment.json. Run 'npm run deploy' to deploy the contract.",
   },
   {
     name: "Network Connectivity",

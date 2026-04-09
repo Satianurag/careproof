@@ -51,10 +51,12 @@ export default function Home() {
             <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <ShieldCheckIcon className="size-5" />
             </div>
-            <span className="text-2xl font-bold tracking-tight">CareProof</span>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl font-bold tracking-tight">CareProof</span>
+            </div>
           </div>
           <Badge variant="secondary" className="font-mono text-xs tracking-wider">
-            {process.env.NEXT_PUBLIC_NETWORK_NAME || "Preview Testnet"}
+            {process.env.NEXT_PUBLIC_NETWORK_NAME || "Preprod"}
           </Badge>
         </div>
       </nav>

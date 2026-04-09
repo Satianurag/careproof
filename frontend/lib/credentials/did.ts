@@ -5,7 +5,7 @@
  * Example: did:midnight:preview:a1b2c3...
  */
 
-export type MidnightNetwork = "undeployed" | "preview" | "preprod" | "mainnet";
+export type MidnightNetwork = "preview" | "preprod";
 
 const toHex = (bytes: Uint8Array): string =>
   Array.from(bytes)
@@ -21,7 +21,7 @@ export function parseDid(did: string): { network: MidnightNetwork; publicKey: st
   const parts = did.split(":");
   if (parts.length !== 4 || parts[0] !== "did" || parts[1] !== "midnight") return null;
   const network = parts[2] as MidnightNetwork;
-  if (!["undeployed", "preview", "preprod", "mainnet"].includes(network)) return null;
+  if (!["preview", "preprod"].includes(network)) return null;
   return { network, publicKey: parts[3] };
 }
 

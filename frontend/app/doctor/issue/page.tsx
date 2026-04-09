@@ -60,7 +60,7 @@ export default function IssuePage() {
   } = useWallet()
 
   const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || ""
-  const networkId = (process.env.NEXT_PUBLIC_MIDNIGHT_NETWORK || "preview") as MidnightNetwork
+  const networkId = (process.env.NEXT_PUBLIC_MIDNIGHT_NETWORK || "preprod") as MidnightNetwork
 
   // Form state
   const [credentialId, setCredentialId] = useState("")

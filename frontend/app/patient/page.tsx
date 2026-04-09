@@ -18,7 +18,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import {
   ShieldCheckIcon,
   ShieldOffIcon,
-  KeyIcon,
   CalendarIcon,
   RefreshCwIcon,
   HandshakeIcon,
@@ -41,9 +40,6 @@ export default function PatientPage() {
   // Consent form
   const [consentDoctorKey, setConsentDoctorKey] = useState("")
   const [consentCredId, setConsentCredId] = useState("")
-
-  // Prove ownership form
-  const [proveCredId, setProveCredId] = useState("")
 
   const [txProgress, setTxProgress] = useState<TxProgress | null>(null)
 
@@ -190,47 +186,6 @@ export default function PatientPage() {
               Revoke Consent
             </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* ── Prove Ownership ───────────────────────────────────── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <KeyIcon className="size-5" />
-            Prove Credential Ownership
-          </CardTitle>
-          <CardDescription>
-            Generate a zero-knowledge proof that you hold a valid, non-revoked, non-expired
-            credential &mdash; without revealing any medical data. The witness retrieves your
-            commitment from private state.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="prove-cred-id">Credential ID</Label>
-            <Input
-              id="prove-cred-id"
-              type="number"
-              placeholder="e.g. 1001"
-              value={proveCredId}
-              onChange={(e) => setProveCredId(e.target.value)}
-            />
-          </div>
-          <Button
-            className="gap-2"
-            disabled={!client || isTxPending || !proveCredId}
-            onClick={() => void handleAction(async () => {
-              await client!.proveCredentialOwnership(
-                { credentialId: BigInt(proveCredId) },
-                setTxProgress,
-              )
-              setProveCredId("")
-            })}
-          >
-            <KeyIcon className="size-4" />
-            Prove Ownership
-          </Button>
         </CardContent>
       </Card>
 

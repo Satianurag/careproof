@@ -59,6 +59,7 @@ async function main() {
     const networkConfig = EnvironmentManager.getNetworkConfig();
     const contractName =
       deployment.contractName || process.env.CONTRACT_NAME || "careproof";
+    const privateStatePassword = EnvironmentManager.getPrivateStatePassword();
     const walletSeed = process.env.WALLET_SEED!;
 
     console.log("Connecting to Midnight network...");
@@ -93,6 +94,7 @@ async function main() {
         contractName,
         walletContext,
         networkConfig,
+        privateStatePassword,
         privateStateStoreName: "careproof-private-state",
       });
 

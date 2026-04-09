@@ -50,7 +50,6 @@ export type {
   ConsentParams,
   RoleParams,
   TransferAdminParams,
-  ProveOwnershipParams,
 } from "./client";
 
 // Transaction pipeline

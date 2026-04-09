@@ -24,7 +24,7 @@ import {
 } from "@/lib/midnight";
 import { toast } from "sonner";
 
-const NETWORK_ID = process.env.NEXT_PUBLIC_MIDNIGHT_NETWORK || "preview";
+const NETWORK_ID = process.env.NEXT_PUBLIC_MIDNIGHT_NETWORK || "preprod";
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
 
 interface WalletContextType {
@@ -267,7 +267,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         isLoadingState,
         connectWallet,
         disconnectWallet,
-        client: clientRef.current,
+        client: null,
         connectedAPI: connectionRef.current?.api ?? null,
         isTxPending,
         txProgress,

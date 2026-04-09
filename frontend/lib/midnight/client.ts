@@ -64,10 +64,6 @@ export interface TransferAdminParams {
   newAdmin: { bytes: Uint8Array };
 }
 
-export interface ProveOwnershipParams {
-  credentialId: bigint;
-}
-
 // ─── Contract client ────────────────────────────────────────────
 
 /**
@@ -224,16 +220,6 @@ export class CareProofClient {
 
   async verifyCredential(params: VerifyCredentialParams, onProgress?: TxProgressCallback): Promise<void> {
     await this.callCircuit("verify_credential", [params.commitment], onProgress);
-  }
-
-  // ─── Write: Patient proof circuit ───────────────────────────
-
-  async proveCredentialOwnership(
-    params: ProveOwnershipParams,
-    onProgress?: TxProgressCallback,
-  ): Promise<Uint8Array | null> {
-    const result = await this.callCircuit("prove_credential_ownership", [params.credentialId], onProgress);
-    return result?.public?.returnValue ?? null;
   }
 
   // ─── Internal: Circuit call bridge ──────────────────────────

@@ -2,7 +2,7 @@
 
 **Privacy-Preserving Healthcare Credentials on Midnight Network**
 
-CareProof enables healthcare organizations to issue, manage, and verify medical credentials using zero-knowledge proofs on the [Midnight Network](https://midnight.network). Only commitment hashes are stored on-chain — no plaintext medical data ever touches the public ledger. Patients prove credential ownership without revealing any personal information.
+CareProof enables healthcare organizations to issue, manage, and verify medical credentials using zero-knowledge proofs on the [Midnight Network](https://midnight.network). Only commitment hashes are stored on-chain — no plaintext medical data ever touches the public ledger. Public testnet operations are supported on Preview and Preprod.
 
 ---
 
@@ -16,14 +16,16 @@ careproof/
 
 ### Contract (`contracts/`)
 
-Written in [Compact](https://docs.midnight.network/develop/tutorial/building/compact) v0.30.0 with 17 compiled ZK circuits:
+Written in [Compact](https://docs.midnight.network) v0.30.0 with 16 compiled ZK circuits:
+
+The OpenZeppelin Compact source library is wired into the root `contracts` package as a local dependency, so `cd contracts && npm install` is the only install step required for contract imports.
 
 | Category | Circuits |
 |----------|----------|
 | **Role Management** | `add_doctor`, `remove_doctor`, `add_verifier`, `remove_verifier`, `transfer_admin` |
 | **Access Control** | `has_doctor_role`, `has_verifier_role`, `has_admin_role` (OZ AccessControl) |
 | **Contract Control** | `pause`, `unpause`, `is_paused` (OZ Pausable) |
-| **Credentials** | `issue_credential`, `revoke_credential`, `prove_credential_ownership` |
+| **Credentials** | `issue_credential`, `revoke_credential` |
 | **Verification** | `verify_credential` |
 | **Consent** | `grant_consent`, `revoke_consent` |
 | **Utility** | `compute_credential_key` (pure) |
@@ -38,14 +40,14 @@ Key design:
 
 ### Frontend (`frontend/`)
 
-Next.js 16 web app with Lace wallet integration via the Midnight DApp Connector API.
+Next.js 16 web app with Lace wallet integration via the Midnight DApp Connector API. The current supported public-testnet write path is the `contracts` CLI; the web app is kept honest by exposing wallet connection and ledger views while leaving contract mutations to the operator tooling.
 
 | Role | Routes | Key Actions |
 |------|--------|-------------|
-| **Admin** | `/admin`, `/admin/roles`, `/admin/control` | Operational stats, environment diagnostics, grant/revoke doctor & verifier roles, pause/unpause, transfer admin |
-| **Doctor** | `/doctor`, `/doctor/issue`, `/doctor/revoke` | Issue credential commitments, revoke credentials, view active/revoked |
-| **Patient** | `/patient`, `/patient/consent`, `/patient/credentials`, `/patient/credentials/[id]` | Manage consent, view credential vault, share via QR/download/copy, prove ownership |
-| **Verifier** | `/verifier`, `/verifier/verify`, `/verifier/history` | Verify by hash/file/paste, on-chain audit log, verification history |
+| **Admin** | `/admin`, `/admin/roles`, `/admin/control` | Operational stats, environment diagnostics, wallet-aware dashboards |
+| **Doctor** | `/doctor`, `/doctor/issue`, `/doctor/revoke` | Commitment preparation, credential views, active/revoked state inspection |
+| **Patient** | `/patient`, `/patient/consent`, `/patient/credentials`, `/patient/credentials/[id]` | Consent views, credential vault, QR/download/copy presentation helpers |
+| **Verifier** | `/verifier`, `/verifier/verify`, `/verifier/history` | Hash/file/paste verification views and on-chain audit history |
 
 **Stack**: Next.js 16 (App Router), React 19, Tailwind CSS v4, shadcn/ui, Lucide icons, `@midnight-ntwrk/dapp-connector-api`.
 
@@ -58,49 +60,34 @@ Next.js 16 web app with Lace wallet integration via the Midnight DApp Connector 
 - **Node.js** >= 22
 - **npm** >= 10
 - [Compact compiler](https://docs.midnight.network) v0.30.0
-- [Docker](https://docs.docker.com/get-docker/) (for localnet and proof server)
 - [Lace wallet](https://www.lace.io/) browser extension (for frontend interaction)
 
-### 1. Start the Local Midnight Network
+### 1. Configure Preview or Preprod
 
-```bash
-cd contracts
-cp standalone.env.example .env
-docker compose -f standalone.yml up -d
+Create `contracts/.env` with your target public testnet and operator secrets:
+
+```env
+MIDNIGHT_NETWORK=preprod
+WALLET_SEED=<64-char-hex-seed>
+PRIVATE_STATE_PASSWORD=<at-least-16-characters>
 ```
 
-Local stack:
-- `http://127.0.0.1:9944` — Midnight node
-- `http://127.0.0.1:8088/api/v3/graphql` — Indexer
-- `ws://127.0.0.1:8088/api/v3/graphql/ws` — Indexer WebSocket
-- `http://127.0.0.1:6300` — Proof server
+Built-in defaults exist for both `preview` and `preprod`, and you can override the indexer/node/proof endpoints via env vars if needed.
 
-### 2. Bootstrap & Fund a Wallet
+### 2. Fund a Public Testnet Wallet
 
 ```bash
 cd contracts
 npm install
-npm run wallet:bootstrap   # Generates .env + accounts.json
-```
-
-Then fund using [midnight-local-dev](https://github.com/midnightntwrk/midnight-local-dev):
-
-```bash
-git clone https://github.com/midnightntwrk/midnight-local-dev.git /tmp/midnight-local-dev
-cd /tmp/midnight-local-dev && npm install && npm start
-# Choose option [1], provide your accounts.json path
-```
-
-Verify funding:
-
-```bash
 npm run check-balance
 ```
+
+If the wallet has no balance, the scripts print your public-testnet funding instructions. Use the matching faucet for `preview` or `preprod`, wait for sync, and rerun the command.
 
 ### 3. Compile & Deploy
 
 ```bash
-npm run compile    # Compact v0.30.0 → 17 circuits
+npm run compile    # Compact v0.30.0 → 16 circuits
 npm run build      # TypeScript
 npm run deploy     # Deploy to configured network
 ```
@@ -113,7 +100,7 @@ Outputs `deployment.json` with the contract address.
 npm run health-check
 ```
 
-Validates: Node.js version, Compact compiler, Docker, `.env`, wallet seed, compiled contract, deployment, indexer connectivity, node RPC connectivity.
+Validates: Node.js version, Compact compiler, `.env`, wallet seed, private state password, compiled contract, build output, indexer connectivity, and node RPC connectivity.
 
 ### 5. Run the Frontend
 
@@ -127,16 +114,16 @@ Create `.env.local`:
 
 ```env
 NEXT_PUBLIC_CONTRACT_ADDRESS=<address-from-deployment.json>
-NEXT_PUBLIC_NETWORK_NAME=Localnet
-NEXT_PUBLIC_INDEXER_URL=http://127.0.0.1:8088/api/v3/graphql
-NEXT_PUBLIC_MIDNIGHT_NETWORK=undeployed
+NEXT_PUBLIC_NETWORK_NAME=Preprod
+NEXT_PUBLIC_INDEXER_URL=https://indexer.preprod.midnight.network/api/v3/graphql
+NEXT_PUBLIC_MIDNIGHT_NETWORK=preprod
 ```
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Connect your Lace wallet and select a role.
+Open [http://localhost:3000](http://localhost:3000). Connect your Lace wallet and explore the wallet-aware dashboards and ledger views.
 
 ---
 
@@ -149,16 +136,16 @@ cd contracts
 npm run cli
 ```
 
-18-option menu covering all 17 circuits: role management, pause/unpause, issue/revoke credentials, verify, consent, role queries, and full ledger state reading.
+18-option operator menu covering the supported public-testnet admin, issuance, verification, consent, role-query, and state-reading flows.
 
-## E2E Smoke Test
+## Contracts Validation
 
 ```bash
 cd contracts
-npm run e2e
+npm run validate
 ```
 
-Deploys a test run against the deployed contract: reads state, checks paused status, grants/revokes roles, pauses/unpauses, and verifies final ledger state.
+Validates the TypeScript operator package and recompiles the Compact contract.
 
 ---
 
@@ -177,8 +164,8 @@ Doctor                          Patient                         Verifier
   │  (commitment hash on-chain)   │                               │
   │──────────────────────────────>│                               │
   │                               │                               │
-  │                               │  3. prove_credential_ownership()
-  │                               │  (ZK proof, no data revealed) │
+  │                               │  3. share commitment / VC     │
+  │                               │  off-chain with verifier      │
   │                               │──────────────────────────────>│
   │                               │                               │
   │                               │  4. verify_credential()       │
@@ -189,8 +176,8 @@ Doctor                          Patient                         Verifier
 ### Privacy Model
 
 - **Issuance**: Credential data is hashed off-chain. Only the `Bytes<32>` commitment is stored in a Merkle tree on-chain.
-- **Ownership proof**: Patient proves they hold a valid, non-revoked, non-expired credential via ZK proof — zero medical data is revealed.
-- **Verification**: Verifier confirms commitment exists in the Merkle tree, is active, and has not expired.
+- **Presentation**: Patients share credential artifacts or commitment references off-chain; no plaintext medical data is published on-chain.
+- **Verification**: Verifier confirms commitment exists on-chain, is active, and has not expired.
 - **Consent**: Patients must explicitly grant consent before a doctor can issue credentials on their behalf.
 
 ---
@@ -201,10 +188,8 @@ Set `MIDNIGHT_NETWORK` in your `.env`:
 
 | Value | Network | Description |
 |-------|---------|-------------|
-| `undeployed` | Localnet | Local Docker stack (default) |
 | `preview` | Preview Testnet | `indexer.preview.midnight.network` |
 | `preprod` | Preprod | `indexer.preprod.midnight.network` |
-| `mainnet` | Mainnet | `indexer.midnight.network` |
 
 All endpoints (indexer, node, proof server) have built-in defaults per network and can be overridden via env vars. See `.env.example` at the project root.
 
@@ -239,8 +224,8 @@ cd frontend && npx next build
 # Contracts typecheck
 cd contracts && npx tsc --noEmit
 
-# Contract E2E smoke tests (22 tests)
-cd contracts && npm run e2e
+# Contracts validation
+cd contracts && npm run validate
 ```
 
 Test coverage:

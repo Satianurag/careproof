@@ -1,4 +1,3 @@
-import { Buffer } from "buffer";
 import path from "path";
 import { httpClientProofProvider } from "@midnight-ntwrk/midnight-js-http-client-proof-provider";
 import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-public-data-provider";
@@ -19,6 +18,7 @@ export interface ProviderConfig {
   contractName: string;
   walletContext: WalletContext;
   networkConfig: NetworkConfig;
+  privateStatePassword: string;
   privateStateStoreName?: string;
 }
 
@@ -34,7 +34,6 @@ export class MidnightProviders {
       config.walletContext,
     );
     const accountId = walletAndMidnightProvider.getCoinPublicKey();
-    const storagePassword = `${Buffer.from(accountId, "hex").toString("base64")}!`;
     const zkConfigProvider = new NodeZkConfigProvider(zkConfigPath);
 
     return {
@@ -43,7 +42,7 @@ export class MidnightProviders {
           config.privateStateStoreName || `${config.contractName}-state`,
         signingKeyStoreName: `${config.contractName}-signing-keys`,
         accountId,
-        privateStoragePasswordProvider: () => storagePassword,
+        privateStoragePasswordProvider: () => config.privateStatePassword,
       }),
       publicDataProvider: indexerPublicDataProvider(
         config.networkConfig.indexer,
@@ -54,5 +53,5 @@ export class MidnightProviders {
       walletProvider: walletAndMidnightProvider,
       midnightProvider: walletAndMidnightProvider,
     };
-   }
+  }
 }
