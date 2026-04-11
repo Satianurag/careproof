@@ -156,10 +156,6 @@ export circuit unpause(): [] {
     Pausable__unpause();
 }
 
-export circuit is_paused(): Boolean {
-    return Pausable_isPaused();
-}
-
 export circuit transfer_admin(new_admin: ZswapCoinPublicKey): [] {
     AccessControl_assertOnlyRole(AccessControl_DEFAULT_ADMIN_ROLE);
     AccessControl_grantRole(
@@ -229,6 +225,9 @@ export circuit issue_credential(
         client: client,
         id: credential_id,
     }));
+
+    // Prevent silent overwrite of an existing credential
+    assert(!credential_hashes.member(composite_key), "Credential already exists");
 
     // Store ONLY the commitment — NO plaintext medical data on-chain
     credential_hashes.insert(composite_key, disclose(commitment));
@@ -324,34 +323,7 @@ export circuit verify_credential(
 // ------------------------------------------------------
 // Utility / Read Circuits
 // ------------------------------------------------------
-
-export circuit compute_credential_key(
-    client: ZswapCoinPublicKey,
-    id: Uint<64>,
-): Bytes<32> {
-    return persistentHash<CredentialKey>(CredentialKey {
-        client: client,
-        id: id,
-    });
-}
-
-export circuit has_doctor_role(doctor: ZswapCoinPublicKey): Boolean {
-    return AccessControl_hasRole(
-        DOCTOR_ROLE,
-        left<ZswapCoinPublicKey, ContractAddress>(doctor)
-    );
-}
-
-export circuit has_verifier_role(verifier: ZswapCoinPublicKey): Boolean {
-    return AccessControl_hasRole(
-        VERIFIER_ROLE,
-        left<ZswapCoinPublicKey, ContractAddress>(verifier)
-    );
-}
-
-export circuit has_admin_role(account: ZswapCoinPublicKey): Boolean {
-    return AccessControl_hasRole(
-        AccessControl_DEFAULT_ADMIN_ROLE,
-        left<ZswapCoinPublicKey, ContractAddress>(account)
-    );
-}
+// NOTE: compute_credential_key, has_doctor_role, has_verifier_role,
+// has_admin_role, and is_paused were removed to reduce contract size
+// below the block deployment limit. Their state can be read directly
+// from the ledger via the indexer.

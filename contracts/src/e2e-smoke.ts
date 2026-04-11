@@ -83,6 +83,7 @@ async function main() {
       contractName,
       walletContext,
       networkConfig,
+      privateStatePassword: process.env.PRIVATE_STATE_PASSWORD || "careproof-e2e-default",
       privateStateStoreName: "careproof-e2e-state",
     });
 

@@ -3,27 +3,13 @@ import path from "path";
 import { setNetworkId } from "@midnight-ntwrk/midnight-js/network-id";
 import { NetworkConfig } from "../providers/midnight-providers.js";
 
-export type SupportedMidnightNetwork = "preview" | "preprod";
-
-const NETWORKS: Record<SupportedMidnightNetwork, NetworkConfig & { networkId: SupportedMidnightNetwork }> = {
-  preview: {
-    key: "preview",
-    name: "Preview Testnet",
-    networkId: "preview",
-    indexer: "https://indexer.preview.midnight.network/api/v3/graphql",
-    indexerWS: "wss://indexer.preview.midnight.network/api/v3/graphql/ws",
-    node: "https://rpc.preview.midnight.network",
-    proofServer: "https://lace-proof-pub.preview.midnight.network",
-  },
-  preprod: {
-    key: "preprod",
-    name: "Preprod",
-    networkId: "preprod",
-    indexer: "https://indexer.preprod.midnight.network/api/v3/graphql",
-    indexerWS: "wss://indexer.preprod.midnight.network/api/v3/graphql/ws",
-    node: "https://rpc.preprod.midnight.network",
-    proofServer: "https://lace-proof-pub.preprod.midnight.network",
-  },
+const LOCALNET_CONFIG: NetworkConfig = {
+  key: "undeployed",
+  name: "Localnet",
+  indexer: "http://127.0.0.1:8088/api/v3/graphql",
+  indexerWS: "ws://127.0.0.1:8088/api/v3/graphql/ws",
+  node: "http://127.0.0.1:9944",
+  proofServer: "http://127.0.0.1:6300",
 };
 
 export interface FundingInstruction {
@@ -32,23 +18,15 @@ export interface FundingInstruction {
 }
 
 export class EnvironmentManager {
-  static getRequestedNetwork(): SupportedMidnightNetwork {
-    const env = process.env.MIDNIGHT_NETWORK as SupportedMidnightNetwork | undefined;
-    return env && env in NETWORKS ? env : "preprod";
-  }
-
   static getNetworkConfig(): NetworkConfig {
-    const requestedNetwork = EnvironmentManager.getRequestedNetwork();
-    const config = NETWORKS[requestedNetwork];
-
-    setNetworkId(config.networkId);
+    setNetworkId("undeployed");
 
     return {
-      ...config,
-      indexer: process.env.INDEXER_URL || config.indexer,
-      indexerWS: process.env.INDEXER_WS_URL || config.indexerWS,
-      node: process.env.NODE_URL || config.node,
-      proofServer: process.env.PROOF_SERVER_URL || config.proofServer,
+      ...LOCALNET_CONFIG,
+      indexer: process.env.INDEXER_URL || LOCALNET_CONFIG.indexer,
+      indexerWS: process.env.INDEXER_WS_URL || LOCALNET_CONFIG.indexerWS,
+      node: process.env.NODE_URL || LOCALNET_CONFIG.node,
+      proofServer: process.env.PROOF_SERVER_URL || LOCALNET_CONFIG.proofServer,
     };
   }
 
@@ -56,9 +34,9 @@ export class EnvironmentManager {
     return {
       title: `How to fund your ${config.name} wallet`,
       steps: [
-        `Navigate to the faucet: https://faucet.${config.key}.midnight.network/`,
-        "Enter your wallet address and request tNIGHT tokens.",
-        "Wait for the wallet to sync after the faucet transfer lands.",
+        "Start the local Midnight network: clone midnight-local-dev and run 'npm start'.",
+        "Choose option [1] to fund accounts from config file, or use 'npm run fund-local'.",
+        "Wait for the wallet to sync after the transfer lands.",
         "Deploy and CLI flows will register DUST automatically when the wallet is ready.",
       ],
     };

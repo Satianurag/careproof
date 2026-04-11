@@ -13,12 +13,17 @@
     "cli": "node dist/cli.js",
     "check-balance": "npm run build && node dist/check-balance.js",
     "health-check": "npm run build && node dist/health-check.js",
+    "fund-local": "npm run build && node dist/fund-local.js",
+    "bootstrap-wallet": "npm run build && node dist/bootstrap-local-wallet.js",
+    "e2e": "npm run build && node dist/e2e-smoke.js",
     "reset": "rm -rf contracts/managed deployment.json dist && npm run compile",
     "validate": "tsc --noEmit && npm run compile",
-    "clean": "rm -rf dist contracts/managed deployment.json"
+    "clean": "rm -rf dist contracts/managed deployment.json",
+    "docker:up": "docker compose -f standalone.yml up -d",
+    "docker:down": "docker compose -f standalone.yml down",
+    "docker:logs": "docker compose -f standalone.yml logs -f"
   },
   "dependencies": {
-    "@openzeppelin-compact/contracts": "file:./contracts/compact-contracts/contracts",
     "@midnight-ntwrk/compact-js": "^2.5.0",
     "@midnight-ntwrk/compact-runtime": "0.15.0",
     "@midnight-ntwrk/ledger-v8": "8.0.3",
@@ -33,10 +38,12 @@
     "@midnight-ntwrk/wallet-sdk-hd": "3.0.1",
     "@midnight-ntwrk/wallet-sdk-shielded": "2.1.0",
     "@midnight-ntwrk/wallet-sdk-unshielded-wallet": "2.1.0",
-    "ws": "^8.18.3",
-    "dotenv": "^16.3.1",
+    "@openzeppelin-compact/contracts": "file:./contracts/compact-contracts/contracts",
+    "bip39": "^3.1.0",
     "chalk": "^5.3.0",
-    "rxjs": "^7.8.0"
+    "dotenv": "^16.3.1",
+    "rxjs": "^7.8.0",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@types/node": "^24.4.0",

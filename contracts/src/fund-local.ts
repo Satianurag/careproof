@@ -22,18 +22,20 @@ import {
 import { getNetworkId, setNetworkId } from "@midnight-ntwrk/midnight-js/network-id";
 import * as Rx from "rxjs";
 import { WebSocket } from "ws";
+import { EnvironmentManager } from "./utils/environment.js";
 
 Reflect.set(globalThis, "WebSocket", WebSocket);
 
 const GENESIS_SEED = "0000000000000000000000000000000000000000000000000000000000000001";
-const NIGHT_AMOUNT = 50_000n * 10n ** 6n; // 50,000 NIGHT
+const NIGHT_AMOUNT = 500_000n * 10n ** 6n; // 500,000 NIGHT
 
+const networkConfig = EnvironmentManager.getNetworkConfig();
 const config = {
-  indexer: "http://127.0.0.1:8088/api/v3/graphql",
-  indexerWS: "ws://127.0.0.1:8088/api/v3/graphql/ws",
-  node: "http://127.0.0.1:9944",
-  proofServer: "http://127.0.0.1:6300",
-  networkId: "undeployed",
+  indexer: networkConfig.indexer,
+  indexerWS: networkConfig.indexerWS,
+  node: networkConfig.node,
+  proofServer: networkConfig.proofServer,
+  networkId: networkConfig.key,
 };
 
 function deriveKeys(seed: Buffer) {
@@ -107,8 +109,6 @@ async function main() {
   console.log(chalk.blue.bold("💰  CareProof Localnet Wallet Funder"));
   console.log(chalk.blue.bold("━".repeat(60)));
   console.log();
-
-  setNetworkId("undeployed");
 
   const recipientSeed = process.env.WALLET_SEED;
   if (!recipientSeed) {

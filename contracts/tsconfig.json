@@ -19,9 +19,6 @@
   "exclude": [
     "node_modules",
     "dist",
-    "contracts/managed",
-    "src/bootstrap-local-wallet.ts",
-    "src/e2e-smoke.ts",
-    "src/fund-local.ts"
+    "contracts/managed"
   ]
 }
