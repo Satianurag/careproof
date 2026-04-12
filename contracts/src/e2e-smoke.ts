@@ -106,26 +106,8 @@ async function main() {
       fail("Read initial ledger state", e);
     }
 
-    // ── 2. is_paused query ───────────────────────────────────────────
-    try {
-      const tx = await deployed.callTx.is_paused();
-      const paused = tx.public.returnValue;
-      if (typeof paused !== "boolean") throw new Error(`Expected boolean, got ${typeof paused}`);
-      pass("is_paused query", tx.public.txId);
-    } catch (e) {
-      fail("is_paused query", e);
-    }
-
-    // ── 3. has_admin_role (self) ─────────────────────────────────────
+    // ── 2. Add doctor (self as test key) ────────────────────────────
     const selfKey = { bytes: Buffer.from(snapshot.coinPublicKey, "hex") };
-    try {
-      const tx = await deployed.callTx.has_admin_role(selfKey);
-      pass("has_admin_role (self)", tx.public.txId);
-    } catch (e) {
-      fail("has_admin_role (self)", e);
-    }
-
-    // ── 4. Add doctor (self as test key) ────────────────────────────
     try {
       const tx = await deployed.callTx.add_doctor(selfKey);
       pass("add_doctor", tx.public.txId);
@@ -133,16 +115,7 @@ async function main() {
       fail("add_doctor", e);
     }
 
-    // ── 5. Confirm doctor role ──────────────────────────────────────
-    try {
-      const tx = await deployed.callTx.has_doctor_role(selfKey);
-      if (tx.public.returnValue !== true) throw new Error("Expected true after add_doctor");
-      pass("has_doctor_role confirms grant", tx.public.txId);
-    } catch (e) {
-      fail("has_doctor_role confirms grant", e);
-    }
-
-    // ── 6. Remove doctor ────────────────────────────────────────────
+    // ── 3. Remove doctor ────────────────────────────────────────────
     try {
       const tx = await deployed.callTx.remove_doctor(selfKey);
       pass("remove_doctor", tx.public.txId);
@@ -150,7 +123,7 @@ async function main() {
       fail("remove_doctor", e);
     }
 
-    // ── 7. Add verifier ─────────────────────────────────────────────
+    // ── 4. Add verifier ─────────────────────────────────────────────
     try {
       const tx = await deployed.callTx.add_verifier(selfKey);
       pass("add_verifier", tx.public.txId);
@@ -158,7 +131,7 @@ async function main() {
       fail("add_verifier", e);
     }
 
-    // ── 8. Remove verifier ──────────────────────────────────────────
+    // ── 5. Remove verifier ──────────────────────────────────────────
     try {
       const tx = await deployed.callTx.remove_verifier(selfKey);
       pass("remove_verifier", tx.public.txId);
@@ -166,7 +139,7 @@ async function main() {
       fail("remove_verifier", e);
     }
 
-    // ── 9. Pause ────────────────────────────────────────────────────
+    // ── 6. Pause ────────────────────────────────────────────────────
     try {
       const tx = await deployed.callTx.pause();
       pass("pause", tx.public.txId);
@@ -174,16 +147,7 @@ async function main() {
       fail("pause", e);
     }
 
-    // ── 10. Confirm paused ──────────────────────────────────────────
-    try {
-      const tx = await deployed.callTx.is_paused();
-      if (tx.public.returnValue !== true) throw new Error("Expected paused=true");
-      pass("is_paused confirms paused", tx.public.txId);
-    } catch (e) {
-      fail("is_paused confirms paused", e);
-    }
-
-    // ── 11. Unpause ─────────────────────────────────────────────────
+    // ── 7. Unpause ──────────────────────────────────────────────────
     try {
       const tx = await deployed.callTx.unpause();
       pass("unpause", tx.public.txId);
@@ -203,7 +167,7 @@ async function main() {
     // Expiry: 1 hour from now (unix seconds)
     const testExpiry = BigInt(Math.floor(Date.now() / 1000) + 3600);
 
-    // ── 12. Grant self doctor role for lifecycle tests ─────────────
+    // ── 8. Grant self doctor role for lifecycle tests ──────────────
     try {
       const tx = await deployed.callTx.add_doctor(selfKey);
       pass("add_doctor (for lifecycle tests)", tx.public.txId);
@@ -211,7 +175,7 @@ async function main() {
       fail("add_doctor (for lifecycle tests)", e);
     }
 
-    // ── 13. Grant consent (self as patient, self as doctor) ───────
+    // ── 9. Grant consent (self as patient, self as doctor) ─────────
     try {
       const tx = await deployed.callTx.grant_consent(selfKey, testCredentialId);
       pass("grant_consent", tx.public.txId);
@@ -219,7 +183,7 @@ async function main() {
       fail("grant_consent", e);
     }
 
-    // ── 14. Issue credential ──────────────────────────────────────
+    // ── 10. Issue credential ─────────────────────────────────────
     try {
       const tx = await deployed.callTx.issue_credential(
         testCredentialId,
@@ -232,7 +196,7 @@ async function main() {
       fail("issue_credential", e);
     }
 
-    // ── 15. Grant self verifier role ──────────────────────────────
+    // ── 11. Grant self verifier role ─────────────────────────────
     try {
       const tx = await deployed.callTx.add_verifier(selfKey);
       pass("add_verifier (for lifecycle tests)", tx.public.txId);
@@ -240,7 +204,7 @@ async function main() {
       fail("add_verifier (for lifecycle tests)", e);
     }
 
-    // ── 16. Verify credential (new signature: no timestamp) ───────
+    // ── 12. Verify credential (new signature: no timestamp) ──────
     try {
       const tx = await deployed.callTx.verify_credential(testCommitment);
       pass("verify_credential (no timestamp param)", tx.public.txId);
@@ -248,7 +212,7 @@ async function main() {
       fail("verify_credential (no timestamp param)", e);
     }
 
-    // ── 17. Verify same credential again (regression: unique log) ─
+    // ── 13. Verify same credential again (regression: unique log) ─
     // Phase 1A fix: nonce in VerificationLogKey prevents overwrite.
     // Both verifications should succeed without error.
     let verificationsBeforeRepeat = 0n;
@@ -272,7 +236,7 @@ async function main() {
       fail("verify_credential repeated (unique log entries)", e);
     }
 
-    // ── 18. Revoke consent, then try to issue (should fail) ───────
+    // ── 14. Revoke consent, then try to issue (should fail) ──────
     try {
       await deployed.callTx.revoke_consent(selfKey, testCredentialId);
       // Now try to issue with same consent — should fail
@@ -294,7 +258,7 @@ async function main() {
       fail("issue after consent revoke should fail", e);
     }
 
-    // ── 19. Revoke credential ─────────────────────────────────────
+    // ── 15. Revoke credential ────────────────────────────────────
     try {
       const tx = await deployed.callTx.revoke_credential(testCredentialId, selfKey);
       pass("revoke_credential", tx.public.txId);
@@ -302,7 +266,7 @@ async function main() {
       fail("revoke_credential", e);
     }
 
-    // ── 20. Verify revoked credential (should fail) ───────────────
+    // ── 16. Verify revoked credential (should fail) ──────────────
     try {
       await deployed.callTx.verify_credential(testCommitment);
       fail("verify revoked credential should fail", new Error("Expected failure but tx succeeded"));
@@ -315,7 +279,7 @@ async function main() {
       }
     }
 
-    // ── 21. Cleanup: remove test roles ────────────────────────────
+    // ── 17. Cleanup: remove test roles ───────────────────────────
     try {
       await deployed.callTx.remove_doctor(selfKey);
       await deployed.callTx.remove_verifier(selfKey);
@@ -324,7 +288,7 @@ async function main() {
       fail("cleanup test roles", e);
     }
 
-    // ── 22. Final ledger state check ──────────────────────────────
+    // ── 18. Final ledger state check ─────────────────────────────
     try {
       const state = await providers.publicDataProvider.queryContractState(deployment.contractAddress);
       if (!state) throw new Error("No state after tests");

@@ -246,7 +246,7 @@ export default function DashboardOverviewPage() {
                 </ResponsiveContainer>
               ) : (
                 <div className="flex items-center justify-center h-full">
-                  <span className="text-neutral-500 text-sm">Deploy contract to view live data</span>
+                  <span className="text-neutral-500 text-sm">Connect to contract to view live data</span>
                 </div>
               )}
             </div>

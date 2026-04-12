@@ -1,4 +1,5 @@
 import { mnemonicToSeedSync } from "bip39";
+import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -70,8 +71,10 @@ const deriveWalletSeed = async (mnemonic: string): Promise<string> => {
 const writeLocalWalletFiles = (walletSeed: string, mnemonic: string) => {
   const envPath = path.resolve(process.cwd(), ".env");
   const accountsPath = path.resolve(process.cwd(), "accounts.json");
+  const privateStatePassword = randomBytes(24).toString("base64");
   const envContent = [
     `WALLET_SEED=${walletSeed}`,
+    `PRIVATE_STATE_PASSWORD=${privateStatePassword}`,
     "PROOF_SERVER_URL=http://127.0.0.1:6300",
     "CONTRACT_NAME=careproof",
   ].join("\n");

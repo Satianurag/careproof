@@ -1,10 +1,30 @@
 import { NextResponse } from "next/server"
+import { readFileSync, existsSync } from "fs"
+import { join } from "path"
 
 const LOCALNET_INDEXER = "http://127.0.0.1:8088/api/v3/graphql"
 
+interface DeploymentConfig {
+  contractAddress: string
+  network: string
+  networkName: string
+  contractName: string
+}
+
+function loadDeploymentConfig(): DeploymentConfig | null {
+  const deploymentPath = join(process.cwd(), "..", "contracts", "deployment.json")
+  if (!existsSync(deploymentPath)) return null
+  try {
+    return JSON.parse(readFileSync(deploymentPath, "utf-8"))
+  } catch {
+    return null
+  }
+}
+
 export async function GET() {
-  const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS
-  const network = "undeployed"
+  const deployment = loadDeploymentConfig()
+  const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || deployment?.contractAddress
+  const network = deployment?.networkName || deployment?.network || "unknown"
   const indexerUrl = process.env.INDEXER_URL || LOCALNET_INDEXER
 
   if (!contractAddress) {
@@ -26,16 +46,16 @@ export async function GET() {
 
   if (!indexerUrl) {
     return NextResponse.json(
-      { connected: false, error: `Unknown network: ${network}` },
+      { connected: false, error: `Unknown network: ${network}`, network },
       { status: 400 },
     )
   }
 
   try {
     const query = `
-      query ContractState($address: HexEncodedBytes!) {
-        contractState(contractAddress: $address) {
-          data
+      query ContractAction($address: HexEncoded!) {
+        contractAction(address: $address) {
+          state
         }
       }
     `
@@ -52,7 +72,7 @@ export async function GET() {
 
     if (!response.ok) {
       return NextResponse.json(
-        { connected: false, error: `Indexer returned ${response.status}` },
+        { connected: false, error: `Indexer returned ${response.status}`, network },
         { status: 502 },
       )
     }
@@ -61,12 +81,12 @@ export async function GET() {
 
     if (json.errors) {
       return NextResponse.json(
-        { connected: false, error: json.errors[0]?.message || "GraphQL error" },
+        { connected: false, error: json.errors[0]?.message || "GraphQL error", network },
         { status: 502 },
       )
     }
 
-    const stateData = json.data?.contractState?.data
+    const stateData = json.data?.contractAction?.state
 
     if (!stateData) {
       return NextResponse.json({
@@ -79,21 +99,33 @@ export async function GET() {
         consent_count: 0,
         verification_log_count: 0,
         paused: false,
+        network,
+        contractAddress,
         raw: null,
       })
     }
 
+    // Contract state is available — the indexer confirmed the contract exists
+    // Ledger counters require the Compact contract module to decode from binary,
+    // so we return connected=true with defaults and the raw state for reference
     return NextResponse.json({
       connected: true,
       error: null,
       raw: stateData,
       contractAddress,
       network,
+      total_credentials: 0,
+      total_verifications: 0,
+      active_count: 0,
+      revoked_count: 0,
+      consent_count: 0,
+      verification_log_count: 0,
+      paused: false,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json(
-      { connected: false, error: `Indexer unreachable: ${message}` },
+      { connected: false, error: `Indexer unreachable: ${message}`, network },
       { status: 502 },
     )
   }

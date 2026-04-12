@@ -84,7 +84,8 @@ npm install
 
 ### Bootstrap a Local Wallet
 
-Generate a new mnemonic, derive the wallet seed, and write `.env` + `accounts.json`:
+Generate a new mnemonic, derive the wallet seed, and write `.env` + `accounts.json`.
+The script automatically generates a secure `PRIVATE_STATE_PASSWORD` in `.env`.
 
 ```bash
 npm run bootstrap-wallet
@@ -218,9 +219,6 @@ The `careproof.compact` contract implements:
 | `issue_credential` | Doctor | Issue credential with commitment hash |
 | `revoke_credential` | Doctor (issuer) | Revoke a previously issued credential |
 | `verify_credential` | Verifier | Verify credential validity + expiry |
-| `is_paused` | Any | Query pause state |
-| `has_doctor_role` / `has_verifier_role` / `has_admin_role` | Any | Query role membership |
-| `compute_credential_key` | Any | Compute composite credential key |
 
 ---
 

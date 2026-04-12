@@ -52,8 +52,8 @@ export default function SettingsPage() {
   const [validationError, setValidationError] = useState<string | null>(null)
   const { state, isLoading } = useContractState()
 
-  const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "Not configured"
-  const network = "undeployed"
+  const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || state?.contractAddress || "Not configured"
+  const network = state?.network || "Localnet"
 
   const handlePauseToggle = () => {
     if (state?.paused) {

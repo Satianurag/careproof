@@ -10,6 +10,7 @@ interface HealthCheck {
   check: () => Promise<boolean>;
   message: string;
   error?: string;
+  warnOnly?: boolean;
 }
 
 const checks: HealthCheck[] = [
@@ -33,7 +34,8 @@ const checks: HealthCheck[] = [
         return false;
       }
     },
-    error: "Compact compiler not found. Install from https://docs.midnight.network",
+    error: "Compact compiler not found. Pre-compiled contracts will still work. Install from https://docs.midnight.network if you need to recompile.",
+    warnOnly: true,
   },
   {
     name: "Environment File",
@@ -164,6 +166,12 @@ async function runHealthCheck() {
 
       if (result) {
         console.log(chalk.green("✓ Passed"));
+        passed++;
+      } else if (check.warnOnly) {
+        console.log(chalk.yellow("⚠ Warning"));
+        if (check.error) {
+          console.log(chalk.yellow(`   ${check.error}`));
+        }
         passed++;
       } else {
         console.log(chalk.red("✗ Failed"));
