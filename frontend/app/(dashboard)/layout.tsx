@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { useContractState } from "@/lib/hooks/use-contract-state"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { SimulationProvider, useSimulation } from "@/lib/simulation-context"
 
 const NAV_ITEMS = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -27,6 +28,7 @@ function SidebarContent({
 }) {
   const pathname = usePathname()
   const { state } = useContractState()
+  const { stats } = useSimulation()
 
   return (
     <div className="p-4">
@@ -72,8 +74,8 @@ function SidebarContent({
           </div>
           <div className="text-xs text-neutral-500">
             <div>NETWORK: LOCALNET</div>
-            <div>CREDENTIALS: {state?.active_count ?? "—"} ACTIVE</div>
-            <div>VERIFICATIONS: {state?.total_verifications ?? "—"} TOTAL</div>
+            <div>CREDENTIALS: {stats.activeCredentials} ACTIVE</div>
+            <div>VERIFICATIONS: {stats.totalVerifications} TOTAL</div>
           </div>
         </div>
       )}
@@ -186,7 +188,9 @@ export default function DashboardLayout({
 }) {
   return (
     <TooltipProvider>
-      <DashboardShell>{children}</DashboardShell>
+      <SimulationProvider>
+        <DashboardShell>{children}</DashboardShell>
+      </SimulationProvider>
     </TooltipProvider>
   )
 }

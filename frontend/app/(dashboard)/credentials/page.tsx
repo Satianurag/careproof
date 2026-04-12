@@ -1,10 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { FileCheck, CheckCircle, XCircle, HandshakeIcon } from "lucide-react"
+import { FileCheck, CheckCircle, XCircle, HandshakeIcon, Search, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { useContractState } from "@/lib/hooks/use-contract-state"
 import { SkeletonCard } from "@/components/skeleton-card"
@@ -15,7 +15,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
 import { z } from "zod"
+import { useSimulation } from "@/lib/simulation-context"
 
 const issueSchema = z.object({
   credentialId: z.string().min(1, "Credential ID is required").refine((v) => /^\d+$/.test(v), "Must be a positive integer"),
@@ -48,7 +50,9 @@ export default function CredentialsPage() {
   const [consentForm, setConsentForm] = useState({ doctorAddress: "", credentialId: "" })
   const [issueErrors, setIssueErrors] = useState<Record<string, string>>({})
   const [consentErrors, setConsentErrors] = useState<Record<string, string>>({})
-  const { state, isLoading } = useContractState()
+  const { isLoading } = useContractState()
+  const { sim, stats, grantConsent, issueCredential, revokeCredential } = useSimulation()
+  const [searchTerm, setSearchTerm] = useState("")
 
   const handleIssue = () => {
     const result = issueSchema.safeParse(issueForm)
@@ -59,7 +63,8 @@ export default function CredentialsPage() {
       return
     }
     setIssueErrors({})
-    toast.success("Submitting issue credential transaction...")
+    issueCredential(issueForm.credentialId, issueForm.patientAddress, issueForm.dataHash, issueForm.expiryDate)
+    toast.success("Credential issued successfully via ZK transaction")
     setShowIssueForm(false)
     setIssueForm({ credentialId: "", patientAddress: "", dataHash: "", expiryDate: "" })
   }
@@ -73,10 +78,18 @@ export default function CredentialsPage() {
       return
     }
     setConsentErrors({})
-    toast.success("Submitting grant consent transaction...")
+    grantConsent(consentForm.doctorAddress, consentForm.credentialId)
+    toast.success("Consent granted successfully via ZK transaction")
     setShowConsentForm(false)
     setConsentForm({ doctorAddress: "", credentialId: "" })
   }
+
+  const filteredCredentials = sim.credentials.filter(
+    (c) =>
+      c.credentialId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.patientAddress.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.dataHash.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
 
   return (
     <div className="p-6 space-y-6">
@@ -107,7 +120,7 @@ export default function CredentialsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-neutral-400 tracking-wider">ACTIVE</p>
-                    <p className="text-2xl font-bold text-white font-mono">{state?.active_count ?? "—"}</p>
+                    <p className="text-2xl font-bold text-white font-mono">{stats.activeCredentials}</p>
                   </div>
                   <FileCheck className="w-8 h-8 text-white" />
                 </div>
@@ -118,7 +131,7 @@ export default function CredentialsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-neutral-400 tracking-wider">TOTAL ISSUED</p>
-                    <p className="text-2xl font-bold text-white font-mono">{state?.total_credentials ?? "—"}</p>
+                    <p className="text-2xl font-bold text-white font-mono">{stats.totalCredentials}</p>
                   </div>
                   <CheckCircle className="w-8 h-8 text-white" />
                 </div>
@@ -129,7 +142,7 @@ export default function CredentialsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-neutral-400 tracking-wider">REVOKED</p>
-                    <p className="text-2xl font-bold text-red-500 font-mono">{state?.revoked_count ?? "—"}</p>
+                    <p className="text-2xl font-bold text-red-500 font-mono">{stats.revokedCredentials}</p>
                   </div>
                   <XCircle className="w-8 h-8 text-red-500" />
                 </div>
@@ -140,7 +153,7 @@ export default function CredentialsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-neutral-400 tracking-wider">CONSENT ENTRIES</p>
-                    <p className="text-2xl font-bold text-orange-500 font-mono">{state?.consent_count ?? "—"}</p>
+                    <p className="text-2xl font-bold text-orange-500 font-mono">{stats.consentCount}</p>
                   </div>
                   <HandshakeIcon className="w-8 h-8 text-orange-500" />
                 </div>
@@ -150,14 +163,78 @@ export default function CredentialsPage() {
         )}
       </div>
 
-      {/* Empty State */}
+      {/* Search */}
       <Card className="bg-neutral-900 border-neutral-700">
-        <CardContent>
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <FileCheck className="w-12 h-12 text-neutral-700 mb-4" />
-            <p className="text-sm text-neutral-400">No credentials issued yet</p>
-            <p className="text-xs text-neutral-500 mt-1">Issue a credential or grant consent to get started</p>
+        <CardContent className="p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-neutral-400" />
+            <Input
+              placeholder="Search credentials by ID, address, or hash..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 bg-neutral-800 border-neutral-600 text-white placeholder-neutral-400"
+            />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Credentials Table */}
+      <Card className="bg-neutral-900 border-neutral-700">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium text-neutral-300 tracking-wider">Credential Registry</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-neutral-700">
+                  <th className="text-left py-3 px-4 text-xs font-medium text-neutral-400 tracking-wider">CREDENTIAL ID</th>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-neutral-400 tracking-wider">PATIENT</th>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-neutral-400 tracking-wider">DATA HASH</th>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-neutral-400 tracking-wider">EXPIRY</th>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-neutral-400 tracking-wider">STATUS</th>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-neutral-400 tracking-wider">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCredentials.map((c) => (
+                  <tr key={c.id} className="border-b border-neutral-800 hover:bg-neutral-800/50 transition-colors">
+                    <td className="py-3 px-4 text-xs text-white font-mono">#{c.credentialId}</td>
+                    <td className="py-3 px-4 text-xs text-neutral-300 font-mono">{c.patientAddress.length > 20 ? c.patientAddress.slice(0, 10) + "..." + c.patientAddress.slice(-6) : c.patientAddress}</td>
+                    <td className="py-3 px-4 text-xs text-neutral-300 font-mono">{c.dataHash.slice(0, 16)}...</td>
+                    <td className="py-3 px-4 text-xs text-neutral-400">{new Date(c.expiryDate).toLocaleDateString()}</td>
+                    <td className="py-3 px-4">
+                      <Badge className={`text-xs ${c.status === "active" ? "bg-green-900 text-green-300 border-green-700" : "bg-red-900 text-red-300 border-red-700"}`}>
+                        {c.status.toUpperCase()}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4">
+                      {c.status === "active" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                          onClick={() => {
+                            revokeCredential(c.credentialId)
+                            toast.success(`Credential #${c.credentialId} revoked successfully`)
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {filteredCredentials.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <FileCheck className="w-12 h-12 text-neutral-700 mb-4" />
+              <p className="text-sm text-neutral-400">No credentials issued yet</p>
+              <p className="text-xs text-neutral-500 mt-1">Issue a credential or grant consent to get started</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

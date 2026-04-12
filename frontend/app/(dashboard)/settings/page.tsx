@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { z } from "zod"
+import { useSimulation } from "@/lib/simulation-context"
 
 const adminSchema = z.object({
   adminAddress: z.string().min(1, "Admin address is required").refine(
@@ -51,15 +52,17 @@ export default function SettingsPage() {
   const [adminAddress, setAdminAddress] = useState("")
   const [validationError, setValidationError] = useState<string | null>(null)
   const { state, isLoading } = useContractState()
+  const { sim, togglePause, resetSimulation } = useSimulation()
 
   const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || state?.contractAddress || "Not configured"
   const network = state?.network || "Localnet"
 
   const handlePauseToggle = () => {
-    if (state?.paused) {
-      toast.success("Submitting unpause contract transaction...")
+    togglePause()
+    if (sim.paused) {
+      toast.success("Contract unpaused successfully")
     } else {
-      toast.success("Submitting pause contract transaction...")
+      toast.success("Contract paused successfully")
     }
   }
 
@@ -89,7 +92,7 @@ export default function SettingsPage() {
             className="border-neutral-700 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-300 bg-transparent"
             onClick={handlePauseToggle}
           >
-            {state?.paused ? (
+            {sim.paused ? (
               <><Play className="w-4 h-4 mr-2" /> Unpause Contract</>
             ) : (
               <><Pause className="w-4 h-4 mr-2" /> Pause Contract</>
@@ -114,8 +117,8 @@ export default function SettingsPage() {
             <Card className="bg-neutral-900 border-neutral-700">
               <CardContent className="p-4">
                 <p className="text-xs text-neutral-400 tracking-wider mb-1">CONTRACT STATUS</p>
-                <Badge variant={state?.paused ? "destructive" : "default"} className={state?.paused ? "" : "bg-green-900 text-green-300 border-green-700"}>
-                  {state?.paused ? "PAUSED" : "ACTIVE"}
+                <Badge variant={sim.paused ? "destructive" : "default"} className={sim.paused ? "" : "bg-green-900 text-green-300 border-green-700"}>
+                  {sim.paused ? "PAUSED" : "ACTIVE"}
                 </Badge>
               </CardContent>
             </Card>

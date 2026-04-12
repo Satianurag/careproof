@@ -6,6 +6,7 @@ import { useContractState } from "@/lib/hooks/use-contract-state"
 import { SkeletonCard } from "@/components/skeleton-card"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts"
+import { useSimulation } from "@/lib/simulation-context"
 
 function InfoTip({ text }: { text: string }) {
   return (
@@ -69,6 +70,7 @@ const PLACEHOLDER_CHART_DATA = [
 
 export default function DashboardOverviewPage() {
   const { state, isLoading } = useContractState()
+  const { sim, stats } = useSimulation()
 
   return (
     <div className="p-6 space-y-6">
@@ -76,7 +78,7 @@ export default function DashboardOverviewPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Total Credentials"
-          value={state?.total_credentials ?? "—"}
+          value={stats.totalCredentials}
           icon={FileCheck}
           iconColor="text-orange-500"
           tooltip="Total number of credentials issued on-chain via the CareProof contract"
@@ -84,21 +86,21 @@ export default function DashboardOverviewPage() {
         />
         <StatCard
           label="Active Credentials"
-          value={state?.active_count ?? "—"}
+          value={stats.activeCredentials}
           icon={ShieldCheck}
           tooltip="Credentials currently in the Merkle tree that have not been revoked or expired"
           isLoading={isLoading}
         />
         <StatCard
           label="Total Verifications"
-          value={state?.total_verifications ?? "—"}
+          value={stats.totalVerifications}
           icon={UserCog}
           tooltip="Number of ZK proof verifications performed by authorized verifiers"
           isLoading={isLoading}
         />
         <StatCard
           label="Revoked Credentials"
-          value={state?.revoked_count ?? "—"}
+          value={stats.revokedCredentials}
           icon={XCircle}
           iconColor="text-red-500"
           valueColor="text-red-500"
@@ -120,15 +122,15 @@ export default function DashboardOverviewPage() {
           <CardContent>
             <div className="grid grid-cols-3 gap-4 mb-6">
               <div className="text-center">
-                <div className="text-2xl font-bold text-white font-mono">&mdash;</div>
+                <div className="text-2xl font-bold text-white font-mono">{stats.doctorCount}</div>
                 <div className="text-xs text-neutral-500">Doctors</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-white font-mono">&mdash;</div>
+                <div className="text-2xl font-bold text-white font-mono">{stats.verifierCount}</div>
                 <div className="text-xs text-neutral-500">Verifiers</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-white font-mono">&mdash;</div>
+                <div className="text-2xl font-bold text-white font-mono">{stats.adminCount}</div>
                 <div className="text-xs text-neutral-500">Admins</div>
               </div>
             </div>
@@ -163,14 +165,7 @@ export default function DashboardOverviewPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3 max-h-80 overflow-y-auto">
-              {[
-                {
-                  time: "Pending...",
-                  actor: "System",
-                  action: "Contract deployed on",
-                  detail: "Localnet",
-                },
-              ].map((log, index) => (
+              {sim.activityLog.slice(0, 10).map((log, index) => (
                 <div
                   key={index}
                   className="text-xs border-l-2 border-orange-500 pl-3 hover:bg-neutral-800 p-2 rounded transition-colors"
@@ -182,9 +177,11 @@ export default function DashboardOverviewPage() {
                   </div>
                 </div>
               ))}
-              <div className="text-xs text-neutral-500 text-center py-4">
-                Activity will appear here once connected to the contract
-              </div>
+              {sim.activityLog.length === 0 && (
+                <div className="text-xs text-neutral-500 text-center py-4">
+                  Activity will appear here once operations are performed
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -268,15 +265,15 @@ export default function DashboardOverviewPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
                     <span className="text-neutral-400">In Merkle Tree</span>
-                    <span className="text-white font-bold font-mono">&mdash;</span>
+                    <span className="text-white font-bold font-mono">{stats.activeCredentials}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-neutral-400">With Active Consent</span>
-                    <span className="text-white font-bold font-mono">&mdash;</span>
+                    <span className="text-white font-bold font-mono">{stats.consentCount}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-neutral-400">Expiring Soon</span>
-                    <span className="text-white font-bold font-mono">&mdash;</span>
+                    <span className="text-white font-bold font-mono">0</span>
                   </div>
                 </div>
               </div>
@@ -289,15 +286,15 @@ export default function DashboardOverviewPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
                     <span className="text-neutral-400">Total Revoked</span>
-                    <span className="text-white font-bold font-mono">&mdash;</span>
+                    <span className="text-white font-bold font-mono">{stats.revokedCredentials}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-neutral-400">Revoked This Month</span>
-                    <span className="text-white font-bold font-mono">&mdash;</span>
+                    <span className="text-white font-bold font-mono">{stats.revokedCredentials}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-neutral-400">Expired</span>
-                    <span className="text-white font-bold font-mono">&mdash;</span>
+                    <span className="text-white font-bold font-mono">0</span>
                   </div>
                 </div>
               </div>

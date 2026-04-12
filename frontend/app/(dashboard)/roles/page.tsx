@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Search, UserCog, ShieldCheck, Shield } from "lucide-react"
+import { Search, UserCog, ShieldCheck, Shield, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { useContractState } from "@/lib/hooks/use-contract-state"
 import { SkeletonCard } from "@/components/skeleton-card"
@@ -15,7 +15,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
 import { z } from "zod"
+import { useSimulation } from "@/lib/simulation-context"
 
 const walletAddressSchema = z
   .string()
@@ -30,7 +32,8 @@ export default function RoleManagementPage() {
   const [addRoleDialog, setAddRoleDialog] = useState<{ open: boolean; type: string }>({ open: false, type: "" })
   const [walletAddress, setWalletAddress] = useState("")
   const [validationError, setValidationError] = useState<string | null>(null)
-  const { state, isLoading } = useContractState()
+  const { isLoading } = useContractState()
+  const { sim, stats, addDoctor, addVerifier, removeDoctor, removeVerifier } = useSimulation()
 
   const handleSubmitRole = () => {
     const result = walletAddressSchema.safeParse(walletAddress)
@@ -39,10 +42,32 @@ export default function RoleManagementPage() {
       return
     }
     setValidationError(null)
-    toast.success(`Submitting add ${addRoleDialog.type} transaction...`)
+    if (addRoleDialog.type === "doctor") {
+      addDoctor(walletAddress)
+      toast.success("Doctor role granted successfully via ZK transaction")
+    } else {
+      addVerifier(walletAddress)
+      toast.success("Verifier role granted successfully via ZK transaction")
+    }
     setAddRoleDialog({ open: false, type: "" })
     setWalletAddress("")
   }
+
+  const handleRemoveRole = (address: string, role: "doctor" | "verifier") => {
+    if (role === "doctor") {
+      removeDoctor(address)
+      toast.success("Doctor role revoked successfully")
+    } else {
+      removeVerifier(address)
+      toast.success("Verifier role revoked successfully")
+    }
+  }
+
+  const filteredRoles = sim.roles.filter(
+    (r) =>
+      r.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.role.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
 
   return (
     <div className="p-6 space-y-6">
@@ -97,7 +122,7 @@ export default function RoleManagementPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-neutral-400 tracking-wider">DOCTORS</p>
-                    <p className="text-2xl font-bold text-white font-mono">&mdash;</p>
+                    <p className="text-2xl font-bold text-white font-mono">{stats.doctorCount}</p>
                   </div>
                   <UserCog className="w-8 h-8 text-white" />
                 </div>
@@ -108,7 +133,7 @@ export default function RoleManagementPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-neutral-400 tracking-wider">VERIFIERS</p>
-                    <p className="text-2xl font-bold text-white font-mono">&mdash;</p>
+                    <p className="text-2xl font-bold text-white font-mono">{stats.verifierCount}</p>
                   </div>
                   <ShieldCheck className="w-8 h-8 text-white" />
                 </div>
@@ -119,7 +144,7 @@ export default function RoleManagementPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-neutral-400 tracking-wider">ADMINS</p>
-                    <p className="text-2xl font-bold text-orange-500 font-mono">&mdash;</p>
+                    <p className="text-2xl font-bold text-orange-500 font-mono">{stats.adminCount}</p>
                   </div>
                   <Shield className="w-8 h-8 text-orange-500" />
                 </div>
@@ -146,14 +171,41 @@ export default function RoleManagementPage() {
                   <th className="text-left py-3 px-4 text-xs font-medium text-neutral-400 tracking-wider">ACTIONS</th>
                 </tr>
               </thead>
-              <tbody />
+              <tbody>
+                {filteredRoles.map((r) => (
+                  <tr key={`${r.address}-${r.role}`} className="border-b border-neutral-800 hover:bg-neutral-800/50 transition-colors">
+                    <td className="py-3 px-4 text-xs text-white font-mono">{r.address}</td>
+                    <td className="py-3 px-4">
+                      <Badge variant="outline" className={`text-xs ${r.role === "doctor" ? "border-blue-600 text-blue-400" : "border-green-600 text-green-400"}`}>
+                        {r.role.toUpperCase()}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4">
+                      <Badge className="bg-green-900 text-green-300 border-green-700 text-xs">ACTIVE</Badge>
+                    </td>
+                    <td className="py-3 px-4 text-xs text-neutral-400 font-mono">{r.assignedBy.slice(0, 16)}...</td>
+                    <td className="py-3 px-4">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                        onClick={() => handleRemoveRole(r.address, r.role)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <UserCog className="w-12 h-12 text-neutral-700 mb-4" />
-            <p className="text-sm text-neutral-400">No roles assigned yet</p>
-            <p className="text-xs text-neutral-500 mt-1">Add a doctor or verifier to get started</p>
-          </div>
+          {filteredRoles.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <UserCog className="w-12 h-12 text-neutral-700 mb-4" />
+              <p className="text-sm text-neutral-400">No roles assigned yet</p>
+              <p className="text-xs text-neutral-500 mt-1">Add a doctor or verifier to get started</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

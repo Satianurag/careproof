@@ -18,6 +18,8 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Info } from "lucide-react"
 import { z } from "zod"
+import { useSimulation } from "@/lib/simulation-context"
+import { Badge } from "@/components/ui/badge"
 
 const verifySchema = z.object({
   dataHash: z.string().min(1, "Credential data hash is required").refine(
@@ -31,7 +33,8 @@ export default function VerificationPage() {
   const [showVerifyForm, setShowVerifyForm] = useState(false)
   const [dataHash, setDataHash] = useState("")
   const [validationError, setValidationError] = useState<string | null>(null)
-  const { state, isLoading } = useContractState()
+  const { isLoading } = useContractState()
+  const { sim, stats, verifyCredential } = useSimulation()
 
   const handleVerify = () => {
     const result = verifySchema.safeParse({ dataHash })
@@ -40,10 +43,23 @@ export default function VerificationPage() {
       return
     }
     setValidationError(null)
-    toast.success("Submitting verify credential transaction...")
+    const { result: verifyResult } = verifyCredential(dataHash)
+    if (verifyResult === "valid") {
+      toast.success("Credential verified successfully — ZK proof valid")
+    } else if (verifyResult === "revoked") {
+      toast.error("Credential has been revoked")
+    } else {
+      toast.error("Credential not found — verification failed")
+    }
     setShowVerifyForm(false)
     setDataHash("")
   }
+
+  const filteredVerifications = sim.verifications.filter(
+    (v) =>
+      v.dataHash.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      v.result.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
 
   return (
     <div className="p-6 space-y-6">
@@ -100,7 +116,7 @@ export default function VerificationPage() {
                         </TooltipContent>
                       </Tooltip>
                     </p>
-                    <p className="text-2xl font-bold text-white font-mono">{state?.total_verifications ?? "—"}</p>
+                    <p className="text-2xl font-bold text-white font-mono">{stats.totalVerifications}</p>
                   </div>
                   <ShieldCheck className="w-8 h-8 text-orange-500" />
                 </div>
@@ -111,7 +127,7 @@ export default function VerificationPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-neutral-400 tracking-wider">VALID</p>
-                    <p className="text-2xl font-bold text-green-400 font-mono">&mdash;</p>
+                    <p className="text-2xl font-bold text-green-400 font-mono">{stats.validVerifications}</p>
                   </div>
                   <CheckCircle className="w-8 h-8 text-green-400" />
                 </div>
@@ -122,7 +138,7 @@ export default function VerificationPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-neutral-400 tracking-wider">FAILED</p>
-                    <p className="text-2xl font-bold text-red-500 font-mono">&mdash;</p>
+                    <p className="text-2xl font-bold text-red-500 font-mono">{stats.failedVerifications}</p>
                   </div>
                   <XCircle className="w-8 h-8 text-red-500" />
                 </div>
@@ -148,14 +164,35 @@ export default function VerificationPage() {
                   <th className="text-left py-3 px-4 text-xs font-medium text-neutral-400 tracking-wider">RESULT</th>
                 </tr>
               </thead>
-              <tbody />
+              <tbody>
+                {filteredVerifications.map((v) => (
+                  <tr key={v.id} className="border-b border-neutral-800 hover:bg-neutral-800/50 transition-colors">
+                    <td className="py-3 px-4 text-xs text-neutral-400 font-mono">{new Date(v.timestamp).toLocaleString()}</td>
+                    <td className="py-3 px-4 text-xs text-white font-mono">{v.dataHash.slice(0, 20)}...</td>
+                    <td className="py-3 px-4 text-xs text-neutral-300 font-mono">{v.verifier.slice(0, 16)}...</td>
+                    <td className="py-3 px-4">
+                      <Badge className={`text-xs ${
+                        v.result === "valid"
+                          ? "bg-green-900 text-green-300 border-green-700"
+                          : v.result === "revoked"
+                            ? "bg-yellow-900 text-yellow-300 border-yellow-700"
+                            : "bg-red-900 text-red-300 border-red-700"
+                      }`}>
+                        {v.result.toUpperCase()}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <ShieldCheck className="w-12 h-12 text-neutral-700 mb-4" />
-            <p className="text-sm text-neutral-400">No verification records yet</p>
-            <p className="text-xs text-neutral-500 mt-1">Verify a credential to create an audit trail entry</p>
-          </div>
+          {filteredVerifications.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <ShieldCheck className="w-12 h-12 text-neutral-700 mb-4" />
+              <p className="text-sm text-neutral-400">No verification records yet</p>
+              <p className="text-xs text-neutral-500 mt-1">Verify a credential to create an audit trail entry</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
